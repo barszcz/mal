@@ -22,3 +22,23 @@ prStr v =
 
         MalNil ->
             "nil"
+
+        MalBool True ->
+            "true"
+
+        MalBool False ->
+            "false"
+
+        MalVector xs ->
+            let
+                joined =
+                    List.map prStr xs
+                        |> String.join " "
+            in
+                "[" ++ joined ++ "]"
+
+        MalHashMap _ ->
+            "{}"
+
+        MalString s ->
+            "\"" ++ s ++ "\""

@@ -4,6 +4,7 @@ import Parser exposing (Parser, (|.), (|=), zeroOrMore, repeat, lazy, oneOf, suc
 import Parser.LanguageKit exposing (variable)
 import Set exposing (Set)
 import Char
+import Dict
 import Types exposing (..)
 
 
@@ -23,12 +24,14 @@ readStr str =
 
 readForm : Parser MalVal
 readForm =
-    Parser.succeed identity
+    succeed identity
         |. whitespace
         |= lazy
             (\_ ->
                 oneOf
-                    [ readList
+                    [ readReaderMacro
+                    , readList
+                    , readVector
                     , readAtom
                     ]
             )
@@ -37,32 +40,86 @@ readForm =
 
 readList : Parser MalVal
 readList =
-    Parser.succeed MalList
-        |. symbol "("
+    succeed MalList
+        |= (lazy (\_ -> readSeq "(" ")"))
+
+
+readVector : Parser MalVal
+readVector =
+    succeed MalVector
+        |= (lazy (\_ -> readSeq "[" "]"))
+
+
+
+-- |> Parser.map (\xs -> MalVector (Array.fromList xs))
+-- readHashMap : Parser MalVal
+-- readHashMap =
+--     succeed MalHashMap
+--         |. symbol "{"
+--         |. whitespace
+--         |= repeat zeroOrMore (lazy (\() -> readForm))
+--         |. whitespace
+--         |. symbol "}"
+
+
+readSeq : String -> String -> Parser (List MalVal)
+readSeq start end =
+    succeed identity
+        |. symbol start
         |. whitespace
         |= repeat zeroOrMore (lazy (\() -> readForm))
         |. whitespace
-        |. symbol ")"
+        |. symbol end
 
 
 readAtom : Parser MalVal
 readAtom =
     oneOf
         [ int
+        , nil
+        , bool
+        , string
         , malSymbol
         ]
-
-
-malSymbol : Parser MalVal
-malSymbol =
-    succeed MalSymbol
-        |= Parser.keep Parser.oneOrMore isSymbolChar
 
 
 int : Parser MalVal
 int =
     succeed MalInt
         |= Parser.int
+
+
+nil : Parser MalVal
+nil =
+    succeed MalNil
+        |. symbol "nil"
+
+
+bool : Parser MalVal
+bool =
+    succeed MalBool
+        |= oneOf
+            [ true
+            , false
+            ]
+
+
+true : Parser Bool
+true =
+    succeed (always True)
+        |= symbol "true"
+
+
+false : Parser Bool
+false =
+    succeed (always False)
+        |= symbol "false"
+
+
+malSymbol : Parser MalVal
+malSymbol =
+    succeed MalSymbol
+        |= Parser.keep Parser.oneOrMore isSymbolChar
 
 
 isSymbolChar : Char -> Bool
@@ -85,6 +142,22 @@ nonSpecialChars =
         |> Set.fromList
 
 
+string : Parser MalVal
+string =
+    succeed MalString
+        |. symbol "\""
+        |= (repeat Parser.zeroOrMore
+                (oneOf
+                    [ symbol "\\\"" |> Parser.map (always "\"")
+                    , symbol "\\\\" |> Parser.map (always "\\")
+                    , Parser.keep (Parser.Exactly 1) (\c -> c /= '"')
+                    ]
+                )
+                |> Parser.map (String.join "")
+           )
+        |. symbol "\""
+
+
 whitespace : Parser ()
 whitespace =
     Parser.ignore zeroOrMore (\c -> Set.member c whitespaceChars)
@@ -95,3 +168,31 @@ whitespaceChars =
     ", \n"
         |> String.toList
         |> Set.fromList
+
+
+readReaderMacro : Parser MalVal
+readReaderMacro =
+    succeed MalList
+        |= lazy (\() -> oneOf readerMacros)
+
+
+readerMacros : List (Parser (List MalVal))
+readerMacros =
+    let
+        macrosList =
+            [ ( "'", "quote" )
+            , ( "`", "quasiquote" )
+            , ( "~@", "splice-unquote" )
+            , ( "~", "unquote" )
+            , ( "@", "deref" )
+            ]
+
+        ctor x y =
+            MalSymbol x :: [ y ]
+
+        helper ( m, v ) =
+            succeed (ctor v)
+                |. symbol m
+                |= lazy (\() -> readForm)
+    in
+        List.map helper macrosList
