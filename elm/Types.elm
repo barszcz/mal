@@ -3,6 +3,10 @@ module Types exposing (..)
 import Dict exposing (Dict)
 
 
+type alias Func =
+    List MalVal -> MalVal
+
+
 type MalVal
     = MalList (List MalVal)
     | MalVector (List MalVal)
@@ -12,3 +16,4 @@ type MalVal
     | MalString String
     | MalNil
     | MalBool Bool
+    | MalFunc Func

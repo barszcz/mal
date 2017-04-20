@@ -75,12 +75,20 @@ readSeq start end =
 readAtom : Parser MalVal
 readAtom =
     oneOf
-        [ int
+        [ negativeInt
+        , int
         , nil
         , bool
         , string
         , malSymbol
         ]
+
+
+negativeInt : Parser MalVal
+negativeInt =
+    Parser.delayedCommit (symbol "-") <|
+        succeed identity
+            |= ((Parser.int) |> Parser.map ((*) -1) |> Parser.map MalInt)
 
 
 int : Parser MalVal

@@ -42,3 +42,6 @@ prStr v =
 
         MalString s ->
             "\"" ++ s ++ "\""
+
+        MalFunc _ ->
+            "<function>"
