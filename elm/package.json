@@ -1,0 +1,8 @@
+{
+  "name": "mal-elm",
+  "version": "1.0.0",
+  "description": "Mal implementation in Elm",
+  "main": "index.js",
+  "author": "Jake Barszcz",
+  "license": "MIT"
+}
